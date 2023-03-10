@@ -1,0 +1,218 @@
+//jshint esversion:6
+
+//requiring all the modules
+const express = require("express");
+const bodyParser = require("body-parser");
+
+const mongoose = require('mongoose');
+
+//Creating the app using express
+const app = express();
+
+//Setting the app, into views through which ejs can be implemented.
+app.set('view engine', 'ejs');
+
+
+//Using Body-parser.
+app.use(bodyParser.urlencoded({ extended: true }));
+
+//To get hold of all the contents inside the public folder.
+app.use(express.static("public"));
+
+//Schema won't follow a strict structure.
+mongoose.set("strictQuery", false);
+
+
+
+
+//Connecting with the mongoose server .
+
+mongoose.connect("mongodb://127.0.0.1:27017/todolistDB", {
+  useNewUrlParser: true
+});
+
+
+
+//Creating our schema
+const itemsSchema = new mongoose.Schema({
+  name: String,
+});
+
+
+
+
+//Creating the collection for todoListDB, which should be singular.
+const Item = mongoose.model("Item", itemsSchema);
+
+//Creating our documents 
+const item1 = new Item({
+  name: "Go to Gym"
+})
+const item2 = new Item({
+  name: "Drink Water"
+})
+const item3 = new Item({
+  name: "Study EJS"
+})
+
+//created an array to store the documents
+const defaultItems = [item1, item2, item3];
+
+const listSchema = new mongoose.Schema({
+  name: String,
+  items: [itemsSchema],
+});
+
+const List = mongoose.model("List", listSchema);
+
+
+//Insert the documents into the database.
+
+
+// Item.insertMany(defaultItems)
+// .then(function(items){
+//   console.log("Database inserted");
+// })
+
+// .catch(function(err){
+//   console.log(err);
+// });
+
+
+//Find and show the documents into the log.
+
+// Item.find()
+
+//     .then(function(items){
+
+
+
+
+//         items.forEach(item => {
+//             console.log(item);
+//         })
+
+//     })
+
+
+
+
+
+
+app.get("/", function (req, res) {
+
+
+  Item.find({})
+    .then(foundItem => {
+      if (foundItem.length === 0) {
+        Item.insertMany(defaultItems)
+        .then(function () {
+            res.redirect("/");
+        })
+        .catch(function(){
+            console.log("Error inserting to the database..");
+        });
+
+      } else {
+        res.render("list", {
+            listTitle: "Today",
+            newListItems: savedItem
+          });
+      }
+    })
+       .catch(err => console.log(err));
+
+
+
+  // res.render("list", {listTitle: "Today", newListItems: defaultItems});
+
+});
+
+app.post("/", function (req, res) {
+
+  const itemName = req.body.newItem;
+  const listName = req.body.list;
+
+
+  const item = new Item({
+    name: itemName,
+  });
+
+  if (listName === "Today") {
+
+    item.save();
+
+    res.redirect("/");
+
+  }
+  else {
+    List.findOne({name:listName})
+    .then(function(foundList){
+      foundList.items.push(item);
+      foundList.save();
+     
+      res.redirect("/" + listName);
+    })
+
+    .catch(function (err){
+      console.log(err);
+    });
+  }
+
+
+});
+
+app.post("/delete", function (req, res) {
+  const checkedItemId = req.body.checkbox;
+
+  Item.findByIdAndRemove(checkedItemId)
+    .then(function () {
+      console.log("Item has been deleted");
+    })
+    .catch(function (err) {
+      console.log(err);
+    });
+  res.redirect("/");
+});
+
+//Custom Title
+
+app.get("/:customTitle", function (req, res) {
+  const paramTitle = req.params.customTitle;
+
+  List.findOne({ name: paramTitle })
+    .then(function (foundItem) {
+      if (!foundItem) {
+
+        const list = new List({
+          name: paramTitle,
+          items: defaultItems,
+
+        })
+
+        list.save();
+        res.redirect("/" + paramTitle);
+      } else {
+        res.render("list", {
+          listTitle: list.name,
+          newListItems: list.items
+        });
+      }
+    })
+    .catch(function (err) {
+      console.log(err);
+    })
+
+
+ 
+
+
+});
+
+app.get("/about", function (req, res) {
+  res.render("about");
+});
+
+app.listen(3000, function () {
+  console.log("Server started on port 3000");
+});
